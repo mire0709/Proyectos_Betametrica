@@ -1,0 +1,199 @@
+---
+title: "Introduccion a la Estadística"
+author: "Mireya Rios"
+date: "2024-01-20"
+output: github_document
+---
+```{r}
+library(lubridate)
+library(openxlsx)
+library(lubridate)
+library(dplyr)
+```
+
+
+#Teoría y principales definiciones
+```{r}
+data<-read.csv("C:\\Users\\USUARIO\\Desktop\\R CURSO\\MATERIAL\\BASES_DATOS_BASES_ZS2ZD2\\Iowa_Liquor_Sales.csv",stringsAsFactors=F,
+header=T)
+
+datos <- data %>% mutate(
+  Sale..Dollars.=(as.numeric(substr(data$Sale..Dollars.,2,15))),
+  City=toupper(City),
+  Date=as.Date(Date,format="%m/%d/%Y"),
+  anio=lubridate::year(Date)) %>% 
+      rename(ventas=Sale..Dollars.,
+             ciudad=City,
+             categoria=Category.Name,
+             nombre_tienda=Store.Name)
+
+```
+#PRUEBAS
+
+```{r}
+datos %>%  group_by(ciudad) %>% 
+  summarise(suma=sum(ventas))
+
+```
+
+#PROMEDIO DE VENTAS POR CIUDAD
+
+```{r}
+datos %>%  group_by(ciudad) %>% 
+  summarise(promedio_ventas=mean(ventas))
+```
+#PROMEDIO DE VENTAS POR SUCURSAL
+
+```{r}
+datos %>%  group_by(nombre_tienda) %>% 
+  summarise(promedio_ventas=mean(ventas)) %>% 
+  arrange(-promedio_ventas)
+```
+
+#EXPANDIENDO RESULTADOS
+
+
+```{r}
+library(tidyverse)
+datos %>%  group_by(ciudad,anio) %>% 
+  summarise_at(vars(ventas),
+               list(maximo=~max(.,na.rm = T),
+                    minimo=~min(.,na.rm = T),
+                    media=~mean(.,na.rm = T)))
+  
+
+```
+
+
+#PIVOTEANDO LA TABLA
+
+
+```{r}
+library(tidyverse)
+datos %>%  group_by(ciudad,anio) %>% 
+  summarise_at(vars(ventas),
+               list(maximo=~max(.,na.rm = T),
+                    minimo=~min(.,na.rm = T),
+                    media=~mean(.,na.rm = T))) %>% 
+  select(ciudad,media,anio) %>% 
+  pivot_wider(names_from = ciudad,
+              values_from = media,
+              values_fill = 0)
+  
+```
+#PIVOTEANDO Y AGREGANDO VALORES
+
+
+```{r}
+datos %>%  group_by(ciudad,anio) %>% 
+  summarise_at(vars(ventas),
+               list(maximo=~max(.,na.rm = T),
+                    minimo=~min(.,na.rm = T),
+                    media=~mean(.,na.rm = T))) %>% 
+  select(ciudad,media,anio,maximo) %>% 
+  pivot_wider(names_from = ciudad,
+              values_from = c(media,maximo),names_prefix = "empresas_",
+              values_fill = 0)
+  
+```
+
+#MEDIA ACOTADA
+
+
+```{r}
+datos %>%  group_by(ciudad,anio) %>% 
+  summarise_at(vars(ventas),
+               list(maximo=~max(.,na.rm = T),
+                    minimo=~min(.,na.rm = T),
+                    media=~mean(.,na.rm = T,trim = 0.99))) %>% #el trim me acota al 0.90
+  select(ciudad,media,anio,maximo) %>% 
+  pivot_wider(names_from = ciudad,
+              values_from = c(media,maximo),names_prefix = "empresas_",
+              values_fill = 0)
+  
+```
+#MEDIDAS DE DISPERSION
+
+
+```{r}
+#QUANTILES
+#QUINTILES
+
+quantile(datos$ventas,probs = seq(0,1,0.2)) #corresponede a 1/5 quintiles
+
+##cuartiles 
+quantile(datos$ventas,probs = seq(0,1,0.25)) #1/4
+
+##deciles
+
+quantile(datos$ventas,probs = seq(0,1,0.10)) #1/10
+```
+#USANDO DPLYR
+```{r}
+datos %>%  group_by(ciudad,anio) %>% 
+  summarise_at(vars(ventas),
+               list(maximo=~max(.,na.rm = T),
+                    minimo=~min(.,na.rm = T),
+                    media=~mean(.,na.rm = T,trim = 0.20),
+                    p_25=~quantile(.,probs = 0.25,na.rm = T),
+                    mediana=~quantile(.,probs = 0.50,na.rm = T))) %>% 
+  select(ciudad,media,anio,maximo,p_25,mediana) %>% 
+  pivot_wider(names_from = ciudad,
+              id_cols = anio,
+              values_from = c(media,maximo,p_25,mediana),names_prefix = "empresas_",
+              values_fill = 0)
+
+```
+
+#AGREGANDO INFORMACION
+
+```{r}
+datos %>%  select(ciudad,ventas) %>%
+  group_by(ciudad) %>% 
+  mutate(n_tile=ntile(ventas,5)) %>% 
+  group_by(ciudad,n_tile) %>% 
+  summarise(sum_ventas=sum(ventas)) %>% 
+ pivot_wider(names_from = ciudad,
+              values_from = c(sum_ventas),names_prefix = "empresas_",
+              values_fill = 0)
+
+  
+```
+
+#TAREA
+
+```{r}
+##TOP 5 DE TIENDAS (PROMEDIO DE VENTAS), PARA EL AÑO 2016, PARA LA CIUDAD CEDAR RAPIDS
+datos %>% filter(anio==2016,ciudad=="CEDAR RAPIDS") %>% 
+  group_by(nombre_tienda) %>% 
+  summarise(Ventas_Promedio=mean(ventas))%>% 
+  arrange(desc(Ventas_Promedio)) %>% 
+  head(5)
+
+```
+
+```{r}
+##¿Cuáles fueron los 5 últimos vendedores (promedio de ventas, para el 2016, para DAVENPORT)?
+datos %>% filter(anio==2016,ciudad=="DAVENPORT") %>% 
+  group_by(Vendor.Name) %>% 
+  summarise(Ventas_Promedio=mean(ventas))%>% 
+  arrange(Ventas_Promedio) %>% 
+  head(5)
+
+```
+
+```{r}
+##¿Cuál es el top 5 de productos más vendidos, para el 2016 y 2017, por ciudad? 
+datos %>% filter(anio==2016 | anio==2017) %>% 
+  group_by(ciudad,anio,Item.Description) %>% 
+  summarise(Total_Productos=sum(Bottles.Sold))%>% 
+  arrange(desc(Total_Productos)) %>% 
+  group_by(ciudad,anio) %>% 
+  slice_head(n=5)
+
+```
+
+
+
+
+
