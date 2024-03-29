@@ -1,0 +1,157 @@
+---
+title: "PROYECTO III"
+author: "Mireya Rios"
+date: "2024-03-28"
+output:
+  github_document
+---
+
+```{r}
+library(openxlsx)
+library()
+
+```
+
+```{r}
+################################SECCION A###############################################
+modelo1<-read.xlsx("C:\\Users\\USUARIO\\Desktop\\R CURSO\\MODULO 3\\PROYECTO.xlsx")
+attach(modelo1)
+#Estimar la regresión log-log para interpretar tasas de crecimiento 
+
+reg1<-lm(log(M1)~log(EXP),data=modelo1)
+summary(reg1)
+```
+Al evaluar la significancia de los parámetros por el p-value, se observa que el coeficiente asociado a las exportaciones es significativo, mientras que el asociado alñ intercepto no lo es, dado que las exportaciones generalmente no pueden ser cero en un contexto económico real, la interpretación del intercepto pierde sentido.
+
+En promedio,  el incremento de un 1% en el nivel de exportaciones, la oferta monetaria se incrementa en un 1.31%, además su signo denotandp una relación positiva.
+
+El R2-ajustado es del 0.8077, es decir, que la oferta monetaria está explicada en un 80.77% de la variablidad en la oferta monetaria puede ser explicada por la variable de exportaciones.
+
+################################SECCION B###############################################
+```{r}
+library(dplyr)
+modelo1<-read.csv("C:\\Users\\USUARIO\\Desktop\\R CURSO\\MODULO 3\\MortalityFertilityIncome.csv") %>%
+  select(Country.Name,m2016,i2016,f2016)
+modelo1 <- modelo1 %>%
+  rename(
+    Pais = Country.Name,
+    Tasa_Mortalidad = m2016,
+    Ingreso_Percapita = i2016,
+    Tasa_Fecundidad = f2016
+  )
+modelo1$Tasa_Mortalidad <- gsub(",", ".", modelo1$Tasa_Mortalidad)
+modelo1$Ingreso_Percapita <- gsub(",", ".", modelo1$Ingreso_Percapita)
+modelo1$Tasa_Fecundidad <- gsub(",", ".", modelo1$Tasa_Fecundidad)
+modelo1$Tasa_Mortalidad<-as.numeric(modelo1$Tasa_Mortalidad)
+modelo1$Ingreso_Percapita<-as.numeric(modelo1$Ingreso_Percapita)
+modelo1$Tasa_Fecundidad<-as.numeric(modelo1$Tasa_Fecundidad)
+modelo1<-modelo1%>%
+  mutate(Tasa_Mortalidad=Tasa_Mortalidad/100,Tasa_Fecundidad=Tasa_Fecundidad/100)
+modelo1 <- na.omit(modelo1)
+###ESTIMAR LA REGRESION
+reg2<-lm(Tasa_Mortalidad~log(Ingreso_Percapita)+log(Tasa_Fecundidad),data=modelo1)
+summary(reg2)
+modelo1$Tasa_Mortalidad_Estimada<-predict(reg2,newdata = modelo1)
+```
+Interpretacion de los resultados:
+
+Los coeficientes asociados a las variables independientes, resultaron estadisticamente significativos.
+
+El coeficiente asociado a la tasa de fecundidad mantiene una relación positiva con la tasa de mortalidad infantil, es decir, en promedio un incremento de un 1% en la tasa de fecundidad incrementa en 0.24 unidades porcentuales en la tasa de mortalidad infantil.
+
+El coeficiente asociado al ingreso percapita mantiene una relacion negativa con la tasa de mortalidad infantil, es decir, en promedio un incremento de un 10% en el ingreso percapita, el nivel de mortalidad infantil disminuye en -0.5 unidades porcentuales en la tasa de mortalidad infantil.
+
+El coeficiente de determinacion ajustado (R2-ajustado) nos indica que el 70.15% de la variabilidad de la variable dependiente esta explicada por las variables incluidas en el modelo.
+
+El estadístico F, rechaza la hipótesis nula, es decir que los coeficientes no son igual a 0.
+
+#########################PRUEBAS DE SUPUESTOS
+
+```{r}
+#Normalidad
+library(strucchange)
+library(moments)
+library(nortest)
+jarque.test(as.vector(reg2$residuals))
+# Rho. Los residuos no siguen una distribución normal
+ad.test(reg2$residuals)
+shapiro.test(reg2$residuals)
+```
+```{r}
+#Autocorrelacion
+library(car)
+library(ggplot2)
+#metodo grafico
+plot(reg2$residuals,type="b")
+qplot(x=c(tail(reg2$residuals,-1),0),
+      y=reg2$residuals)
+#Estadistivo Durbin Watson
+
+library(lmtest)
+dwtest(reg2)
+#No Rho, es decir no existe un problema de autocorrelacion
+```
+```{r}
+#Heterocedasticidad
+#metodo grafico
+# Obtener residuos y valores ajustados
+residuos <- residuals(reg2)
+valores_ajustados <- predict(reg2)
+
+# Crear un gráfico de dispersión de residuos vs. valores ajustados
+ggplot(data = data.frame(Residuos = residuos, Valores_Ajustados = valores_ajustados), aes(x = Valores_Ajustados, y = Residuos)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Línea horizontal en y = 0
+  labs(x = "Valores Ajustados", y = "Residuos", title = "Grafico de dispersion de residuos vs. valores ajustados")
+
+#######Aplicando para cada variable independiente
+qplot(x=log(modelo1$Tasa_Fecundidad), # y estimada
+      y=(reg2$residuals))+ # errores
+  geom_point()
+
+# Podria estar causando la heterocedasticidad dado la forma de la gráfica.
+
+qplot(x=log(modelo1$Ingreso_Percapita), # y estimada
+      y=(reg2$residuals))+ # errores
+  geom_point()
+
+#Se puede determinar visualmente, que la variable que puede estar causando la hetero es la tasa de fecundidad.
+## Contraste Breush Pagan
+
+bptest(reg2)
+
+#R.ho la varianza de los errores no es homocedastica.
+
+ncvTest(reg2)
+
+# Problema de heterocedasticidad.
+
+modelo_individual<-lm(abs(reg2$residuals)~log(Ingreso_Percapita),data=modelo1)
+summary(modelo_individual)
+modelo_individual<-lm(abs(reg2$residuals)~log(Tasa_Fecundidad),data=modelo1)
+summary(modelo_individual)
+# el coeficiente asociado es significativo, por lo que la tasa de fecundidad y el ingreso percapita estan influenciando en el modelo afectando a la heterocedasticidad.
+
+############### MULTICOLINEALIDAD
+library(GGally)
+library(dynlm)
+library(forecast)
+library(nlme)
+library(sandwich)
+library(car)
+library(ggplot2)
+library(lmtest)
+ggpairs(modelo1[,2:4], lower = list(continuous = "smooth"),
+        diag = list(continuous = "barDiag"), axisLabels = "none")
+
+# El par de variables con el coeficiente de correlación mayor se da entre la tasa de mortalidad y la tasa de fecundidad, de manera positiva.
+reg2<-lm(Tasa_Mortalidad~log(Ingreso_Percapita)+log(Tasa_Fecundidad),data=modelo1)
+vif(reg2)
+#VIF menor a 10, no hay predictores que muestren una inflación de varianza.
+#ATENUANDO LA HETEROCEDASTICIDAD
+
+# Se paplica un modelo no invasivo robusto a la heterocedasticidad y autocorrelación. NeweyWest
+#metodo no invasivo
+coeftest(reg2,vcov. = NeweyWest(reg2))
+```
+
