@@ -1,0 +1,119 @@
+---
+title: "PROYECTO II"
+author: "Mireya Rios"
+date: "2024-02-16"
+output:
+  github_document
+---
+```{r libreria, echo=FALSE,message=FALSE,warning=FALSE,comment=""}
+library(openxlsx)
+library(lubridate)
+library(reshape2)
+library(dplyr)
+library(ggplot2)
+library(gganimate)
+library(animation)
+
+```
+```{r basedatos, echo=FALSE,message=FALSE,warning=FALSE,comment=""}
+data <- read.xlsx("C:\\Users\\USUARIO\\Desktop\\R CURSO\\MODULO2\\MATERIAL\\BASE PROYECTO.xlsx",detectDates = T, sheet = "Hoja2")
+data_final<-data %>% mutate(inflacion.mensual=inflacion.mensual*100,
+                            anio=year(Fecha),
+                            mes=month(Fecha))
+
+maagrupado<-data_final %>% select(anio,mes,inflacion.mensual) 
+
+maagrupado<- melt(maagrupado,id.vars = c("anio","mes"))
+```
+
+
+
+Realiza un boxplot usando ggplot2, de UNA de las variables que hayas descargado.
+
+#BOXPLOT INFLACION MENSUAL
+
+```{r}
+ggplot(maagrupado,
+       aes(x = factor(anio), y = value, fill = variable)) +
+  geom_boxplot(color = "brown", position = position_dodge(width = 0.8)) +
+ labs(title="Inflación Mensual Ecuador",
+      subtitle="Período Enero2017-Agosto2023",
+      caption = "Fuente: Inec\n Elaboracion:Mireya Rios",
+       x="Período",
+       y="Porcentaje")+
+  geom_jitter(width = 0.2, alpha = 0.5, color = "black") +
+  facet_wrap(~variable, scale = "free") +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(maagrupado,
+       aes(x = factor(mes), y = value, fill = variable)) +
+  geom_boxplot(color = "brown", position = position_dodge(width = 0.8)) +
+ labs(title="Inflación Mensual Ecuador",
+      subtitle="Período Enero2017-Agosto2023",
+      caption = "Fuente: Inec\n Elaboracion:Mireya Rios",
+       x="Período",
+       y="Porcentaje")+
+  geom_jitter(width = 0.2, alpha = 0.5, color = "black") +
+  facet_wrap(~variable, scale = "free") +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+Realiza un gráfico de barras NO apiladas para 2 variables que tengan sentido analizar, por ejemplo: exportaciones e importaciones; crédito y depósitos, etc.
+
+#BARRAS NO APILADAS DE LAS EXPORTACIONES PETROLERAS Y NO PETROLERAS
+
+```{r}
+maagrupado1<-data_final %>% select(anio,mes,EXPORTACIONES.PETROLERAS,EXPORTACIONES.NO.PETROLERAS) 
+maagrupado1<- melt(maagrupado1,id.vars = c("anio","mes"))
+ggplot(data = maagrupado1) +
+  aes(x = variable, y = value, fill=variable) +
+  geom_bar(position = "dodge", stat = "identity") +
+  coord_flip()  +
+  guides(fill = guide_legend(title = "Tipo de Exportaciones"))+
+  theme(legend.position = "bottom")+
+   scale_fill_hue(labels = c("Exp. Petroleras", "Exp. No Petroleras")) +
+  labs(
+    title = "Evolución de las exportaciones del Ecuador Enero2017-Agosto2023",
+    subtitle = "En miles de millones",
+    caption = "Fuente: BCE\nElaboración: Mireya Rios"
+  )
+
+```
+
+#Escoge 2 variables y realiza un gráfico de líneas en dos cuadros (usando facet). Este gráfico debe incorporar la linea de tendencia para las dos variables.
+
+#GRAFICO DE LINEAS 
+```{r}
+maagrupado2<-data_final %>% select(Fecha,`OFERTA.MONETARIA.(M1)`,`LIQUIDEZ.TOTAL.(M2)`) 
+maagrupado2<- melt(maagrupado2,id.vars = c("Fecha"))
+ggplot(data = maagrupado2, aes(x = Fecha, y = value, group = variable,color=variable)) +
+  geom_line(color = "pink") +
+  geom_point(color = "brown", show.legend = FALSE) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue", linetype = "dashed") +
+  facet_wrap(~variable, scales = "free") +
+  labs(
+    title = "Variables de Liquidez",
+    y = "Miles de Millones",
+    x = "Fecha de Análisis"
+  ) +
+  theme_minimal() +
+   theme(strip.text = element_text(face = "bold", color = "white", hjust = 0, size = 15),
+        strip.background = element_rect(fill = "dodgerblue3", linetype = "solid",
+                                        color = "black", linewidth = 1))
+```
+#Prueba generando un gráfico usando dygraphs o plotly
+
+#GRAFICOS ADICIONALES
+
+```{r}
+library(dygraphs)
+datosdy <- data_final %>% 
+  select(Importacion.Diesel,Importacion.Gas.Licuado.de.Petróleo,Importacion.Nafta.de.Alto.Octano)
+tsdatos <- ts(datosdy,start = c(2017,01),frequency = 12)
+dygraph(tsdatos,main="Evolucion de las importaciones de Ecuador",xlab="Periodo",ylab="millones de dólares") %>% 
+  dyOptions(fillGraph=T,fillAlpha=0.04,
+            drawPoints = T,pointSize = 2)%>% dyRangeSelector()
+
+```
