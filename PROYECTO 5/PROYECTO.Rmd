@@ -1,0 +1,113 @@
+---
+title: "PROYECTO UNIDAD 5"
+author: "Mireya Rios"
+date: "2024-05-01"
+output:
+  github_document
+---
+Del archivo BOL_BP_MAY_2017  seleccione los siguientes indicadores, para los bancos, sin considerar las columnas de TOTALES.1.Activos productivos/total activos,2.Morosidad cartera total,3.Gastos de Operación/Margen Financiero,4.Rentabilidad del ejercicio/ activo promedio,5.Fondos disponibles/total depositos corto plazo
+```{r}
+library(readxl)
+library(dplyr)
+library(cluster)
+library(devtools)
+library(factoextra)
+library(fpc)
+library(gridExtra)
+base<-read_excel("C:\\Users\\USUARIO\\Desktop\\R CURSO\\MODULO5\\MATERIAL\\MACHINE-LEARNING-1_SL8ZUQ\\MACHINE LEARNING 1\\parte 2\\BOL_BP_MAY_ 2017.xlsx",sheet = "INDICADORES",skip=6)
+names(base)
+final<-base %>% select(- c("...2","BANCOS PRIVADOS GRANDES","BANCOS PRIVADOS MEDIANOS","BANCOS PRIVADOS PEQUEÑOS",
+                           "TOTAL BANCOS PRIVADOS","BANCOS PRIVADOS COMERCIALES","BANCOS PRIVADOS CONSUMO","BANCOS PRIVADOS VIVIENDA","BANCOS PRIVADOS DE MICROEMPRESA","COD. MAF."))
+final$`NOMBRE DEL INDICADOR`<-trimws(final$`NOMBRE DEL INDICADOR`)
+names(final)
+final <- final %>% 
+  filter(`NOMBRE DEL INDICADOR` %in% c("ACTIVOS PRODUCTIVOS / TOTAL ACTIVOS",
+                                       "MOROSIDAD DE LA CARTERA TOTAL",
+                                       "GASTOS DE OPERACION  / MARGEN FINANCIERO",
+                                       "RESULTADOS DEL EJERCICIO / ACTIVO PROMEDIO",
+                                       "FONDOS DISPONIBLES / TOTAL DEPOSITOS A CORTO PLAZO"))
+
+#convertir en numericos
+
+final<-as.data.frame(t(final))
+colnames(final) <- final[1, ]
+final <- final[-1, ] 
+final <- final %>%
+  mutate_all(as.numeric)
+
+
+```
+Construya un cluster jerarquico. Grafique y comente su composición, usando al menos 2 distancias y dos métodos de clasificación
+```{r}
+#Previamente se escalan las variables para evitar influya de manera arbitraria alguna de las variables
+data <- as.data.frame(scale(final))
+#Distancia Euclideana - Metodo wards
+cluster<-hclust(dist(data,method ="euclidean"),
+                method = "ward.D")
+plot(cluster,hang = -0.01,cex=0.8)
+#Distancia Euclideana - Metodo Promedio
+cluster2<-hclust(dist(data,method ="euclidean"),
+                method = "average")
+plot(cluster2,hang = -0.01,cex=0.8)
+par(mfrow=c(1,2))
+plot(cluster,hang = -0.01,cex=0.8);plot(cluster2,hang = -0.01,cex=0.8)
+
+#distancia<-dist(data,method ="euclidean")
+#distancia #mientras más cercano a 0 este, menor distancia
+cluster$merge
+grupos<-as.data.frame(cutree(cluster, k=4))
+
+#Metodo divisivo: DIANA
+ncluster<-diana(data,metric="euclidean") #divisible 0.82 cercano a 1, buena clasificación.
+par(mfrow=c(1,2))
+plot(ncluster)
+plot(cluster,hang = -0.01,cex=0.8,main = "Dendrogram of DIANA")
+cluster1<-hcut(data,k=4,stand=T,
+               hc_metric = "euclidean",
+               hc_method = "ward.D")
+fviz_dend(cluster1, rect=T,
+          cex=0.5,
+          k_colors=c("blue","red","black","skyblue"))
+fviz_cluster(object = list(data=data, cluster=cutree(cluster, k=4)),
+             ellipse.type = "convex", repel = TRUE, show.clust.cent = FALSE,
+             labelsize = 8)
+```
+##Construya un cluster no jerarquico. Determine el número óptimo de clusters, grafique y comente.
+```{r}
+###cálculo de los clúster óptimos
+library(NbClust)
+clusteroptimo<-NbClust(data,
+                       distance = "euclidean",
+                       min.nc=2,
+                       max.nc=6,
+                       method = "ward.D",
+                       index="all")
+#3 cluster
+cluster_nojerarquico2<-kmeans(data,3)
+cluster_nojerarquico2 # 62.3% como porcentaje de separación, ,mientras más cercano a 1, existe una mayor calidad en el modelo
+#evaluando el cluster
+silueta<-silhouette(cluster_nojerarquico2$cluster,
+                    dist(data,method = "euclidean"))
+fviz_silhouette(silueta) # no tienen que ser negativo, las barras sean cercanas a 1
+fviz_cluster(cluster_nojerarquico2,data=data,ellipse.type = "convex") + 
+  theme_classic()
+#promedios de cada cluster
+cluster_nojerarquico2$centers
+#numero de iteraciones
+cluster_nojerarquico2$iter
+datos_k<-data %>% mutate(grp=cluster_nojerarquico2$cluster)
+medoides<-pam(data,3) 
+medoides
+gm<-fviz_cluster(medoides,data=data)
+gm
+#METODO CLARA
+modeloclara<-clara(data,k=3,sample=5)
+modeloclara
+table(modeloclara$clustering)
+gclara<-fviz_cluster(modeloclara,data=data)
+#grupo<-grid.arrange(gm,gc,gclara,ncol=3)
+centroide<-kmeans(data,2)
+gc<-fviz_cluster(centroide,data=data)
+grupo<-grid.arrange(gm,gc,gclara,ncol=3) 
+```
+
